@@ -37,6 +37,8 @@ import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
 import java.security.AccessControlException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.MissingResourceException;
@@ -347,18 +349,28 @@ public class HomePrintableComponent extends JComponent implements Printable {
         && (homePrint == null || homePrint.isFurniturePrinted())) {
       FurnitureTable furnitureTable = null;
       final FurnitureTable.FurnitureFilter furnitureFilter;
+      List<HomePieceOfFurniture.SortableProperty> printedFurnitureVisibleProperties = null;
       if (furnitureView instanceof FurnitureTable
           && (homePrint == null
               || homePrint.isPlanPrinted()
               || homePrint.isView3DPrinted())) {
-        final Level selectedLevel = home.getSelectedLevel();
+        // final Level selectedLevel = home.getSelectedLevel();
         furnitureTable = (FurnitureTable)furnitureView;
         furnitureFilter = furnitureTable.getFurnitureFilter();
+        // Temporarily add the level property to the printed furniture table columns
+        List<HomePieceOfFurniture.SortableProperty> furnitureVisibleProperties =
+                new ArrayList<HomePieceOfFurniture.SortableProperty>(home.getFurnitureVisibleProperties());
+        if (!furnitureVisibleProperties.contains(HomePieceOfFurniture.SortableProperty.LEVEL)) {
+          furnitureVisibleProperties.add(HomePieceOfFurniture.SortableProperty.LEVEL);
+          this.controller.getFurnitureController().setFurnitureVisibleProperties(furnitureVisibleProperties);
+          printedFurnitureVisibleProperties = new ArrayList<HomePieceOfFurniture.SortableProperty>(home.getFurnitureVisibleProperties());
+        }
         furnitureTable.setFurnitureFilter(new FurnitureTable.FurnitureFilter() {
+            // Print furniture of all viewable levels when the furniture table is printed
             public boolean include(Home home, HomePieceOfFurniture piece) {
               // Print only furniture at selected level when the plan or the 3D view is printed
               return (furnitureFilter == null || furnitureFilter.include(home, piece))
-                  && piece.isAtLevel(selectedLevel)
+                  // && piece.isAtLevel(selectedLevel)
                   && (piece.getLevel() == null || piece.getLevel().isViewable());
             }
           });
@@ -368,8 +380,11 @@ public class HomePrintableComponent extends JComponent implements Printable {
       // Try to print next furniture view page      
       pageExists = ((Printable)furnitureView).print(g2D, pageFormat, page);
       if (furnitureTable != null) {
-        // Restore previous filter
+        // Restore previous filter and furniture visible properties
         ((FurnitureTable)furnitureView).setFurnitureFilter(furnitureFilter);
+        if (printedFurnitureVisibleProperties != null) {
+          this.controller.getFurnitureController().setFurnitureVisibleProperties(printedFurnitureVisibleProperties);
+        }
       }
       if (pageExists == PAGE_EXISTS
           && !this.printablePages.contains(page)) {
